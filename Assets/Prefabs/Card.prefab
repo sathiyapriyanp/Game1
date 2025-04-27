@@ -149,4 +149,4 @@ MonoBehaviour:
   id: 0
   cardBack: {fileID: -676617385, guid: 7136de94fe0e0ea4a8dcd88e8b7f5ba3, type: 3}
   cardFront: {fileID: -366961658, guid: 7136de94fe0e0ea4a8dcd88e8b7f5ba3, type: 3}
-  flipSpeed: 1
+  flipSpeed: 10

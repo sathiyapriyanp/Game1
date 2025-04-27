@@ -11,115 +11,67 @@ public class Card : MonoBehaviour
 
     private Image image;
     private Button button;
-    private bool isFlippingOpen;
-    private bool isFlippingClose;
-    public bool flipFinished = false;
-    private float flipAmount = 1;
-    public float flipSpeed = 4;
+    private bool isFlipping = false;
+    private float flipAmount = 1f;
+    public float flipSpeed = 4f;
+    private bool isOpen = false;
 
-    void Start()
+    public bool IsOpen => isOpen;
+    public bool IsFlipping => isFlipping;
+
+    private void Start()
     {
         image = GetComponent<Image>();
         button = GetComponent<Button>();
+        button.onClick.AddListener(FlipCard);
     }
 
     public void FlipCard()
     {
-        if (CardManager.instance.choice1 == 0)
-        {
-            CardManager.instance.choice1 = id;
-            CardManager.instance.AddChoosenCard(this.gameObject);
-            StartCoroutine(FlipOpen());
-            button.interactable = false;
-        }
-        else if (CardManager.instance.choice2 == 0)
-        {
-            CardManager.instance.choice2 = id;
-            CardManager.instance.AddChoosenCard(this.gameObject);
-            StartCoroutine(FlipOpen());
-            button.interactable = false;
-            StartCoroutine(WaitThenCompare());
-        }
+        if (isFlipping || isOpen || CardManager.instance.IsComparing())
+            return;
+
+        CardManager.instance.AddChosenCard(this);
+        StartCoroutine(FlipAnimation(true));
     }
 
-    IEnumerator WaitThenCompare()
+    public void ForceCloseCard()
     {
-        while (!CardManager.instance.choosenCards[0].GetComponent<Card>().flipFinished ||
-               !CardManager.instance.choosenCards[1].GetComponent<Card>().flipFinished)
-        {
-            yield return null;
-        }
-        StartCoroutine(CardManager.instance.CompareCards());
+        if (!isOpen || isFlipping) return;
+        StartCoroutine(FlipAnimation(false));
     }
 
-    IEnumerator FlipOpen()
+    IEnumerator FlipAnimation(bool opening)
     {
-        flipFinished = false;
+        isFlipping = true;
 
+        // Shrink
         while (flipAmount > 0)
         {
             flipAmount -= Time.deltaTime * flipSpeed;
             flipAmount = Mathf.Clamp01(flipAmount);
-            transform.localScale = new Vector3(flipAmount, transform.localScale.y, transform.localScale.z);
-
-            if (flipAmount <= 0)
-            {
-                image.sprite = cardFront;
-                break;
-            }
+            transform.localScale = new Vector3(flipAmount, 1, 1);
             yield return null;
         }
 
+        // Change sprite
+        image.sprite = opening ? cardFront : cardBack;
+        isOpen = opening;
+
+        // Expand
         while (flipAmount < 1)
         {
             flipAmount += Time.deltaTime * flipSpeed;
             flipAmount = Mathf.Clamp01(flipAmount);
-            transform.localScale = new Vector3(flipAmount, transform.localScale.y, transform.localScale.z);
-
-            if (flipAmount >= 1)
-            {
-                flipFinished = true;
-                break;
-            }
+            transform.localScale = new Vector3(flipAmount, 1, 1);
             yield return null;
         }
-    }
 
-    IEnumerator FlipClose()
-    {
-        flipFinished = false;
+        isFlipping = false;
 
-        while (flipAmount > 0)
+        if (opening && CardManager.instance.ReadyToCompare())
         {
-            flipAmount -= Time.deltaTime * flipSpeed;
-            flipAmount = Mathf.Clamp01(flipAmount);
-            transform.localScale = new Vector3(flipAmount, transform.localScale.y, transform.localScale.z);
-
-            if (flipAmount <= 0)
-            {
-                image.sprite = cardBack;
-                break;
-            }
-            yield return null;
+            CardManager.instance.StartCompareProcess();
         }
-
-        while (flipAmount < 1)
-        {
-            flipAmount += Time.deltaTime * flipSpeed;
-            flipAmount = Mathf.Clamp01(flipAmount);
-            transform.localScale = new Vector3(flipAmount, transform.localScale.y, transform.localScale.z);
-
-            if (flipAmount >= 1)
-            {
-                break;
-            }
-            yield return null;
-        }
-        button.interactable = true;
-    }
-
-    public void CloseCard()
-    {
-        StartCoroutine(FlipClose());
     }
 }
