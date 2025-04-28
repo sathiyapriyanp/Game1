@@ -30,14 +30,19 @@ public class Card : MonoBehaviour
     {
         if (isFlipping || isOpen || CardManager.instance.IsComparing())
             return;
+        SoundManager.instance.PlaySound(SoundManager.instance.flipSound);
 
+        // Increment the click count
+        CardManager.instance.UpdateClicksUI(); // Track click count on each flip
         CardManager.instance.AddChosenCard(this);
         StartCoroutine(FlipAnimation(true));
+        CardManager.instance.IncrementClicks();
     }
 
     public void ForceCloseCard()
     {
         if (!isOpen || isFlipping) return;
+        SoundManager.instance.PlaySound(SoundManager.instance.flipSound);
         StartCoroutine(FlipAnimation(false));
     }
 

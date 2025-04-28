@@ -1,16 +1,15 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using System.Collections.Generic;
 using UnityEngine.SceneManagement;
+using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class CardManager : MonoBehaviour
-
 {
     public static CardManager instance;
 
     [Header("Card Settings")]
-    public int pairs = 6;
+    public int pairs = 6; // The number of pairs of cards
     public GameObject cardPrefab;
     public Transform spacer;
     public List<Sprite> spriteList = new List<Sprite>();
@@ -22,10 +21,30 @@ public class CardManager : MonoBehaviour
 
     [Header("UI Elements")]
     public Text scoreText;
+    public Text comboCountText;
+    public Text timerText;
+    public Text clicksText; 
 
     private List<Card> allCards = new List<Card>();
     private List<Card> chosenCards = new List<Card>();
     private bool isComparing = false;
+
+    // Timer variables
+    public float startTime = 120f; 
+    private float timer;
+    public bool timerRunning = false;
+
+    // Combo count
+    private int correctComboCount = 0;
+
+    // Click counter
+    private int totalClicks = 0;
+
+    [Header("Layout Settings")]
+    public int rows = 3; 
+    public int columns = 4; 
+
+
 
     private void Awake()
     {
@@ -35,22 +54,87 @@ public class CardManager : MonoBehaviour
 
     private void Start()
     {
-        LoadScore();
+        timer = startTime;
+        timerRunning = true;
+
+        currentScore = 0;
+        correctComboCount = 0;
+        totalClicks = 0;
+
         UpdateScoreUI();
+        UpdateComboCountUI();
+        UpdateClicksUI();
+        UpdateTimerUI();
+
         FillPlayField();
+
+        comboCountText.gameObject.SetActive(true);
+        clicksText.gameObject.SetActive(true);
+        timerText.gameObject.SetActive(true);
+        scoreText.gameObject.SetActive(true);
+    }
+
+    private void Update()
+    {
+        if (timerRunning)
+        {
+            timer -= Time.deltaTime; 
+            if (timer <= 0)
+            {
+                timer = 0;
+                EndGame(); 
+            }
+            UpdateTimerUI();
+        }
+    }
+
+    void ArrangeCardsInGrid()
+    {
+        GridLayoutGroup grid = spacer.GetComponent<GridLayoutGroup>();
+        if (grid == null)
+        {
+            grid = spacer.gameObject.AddComponent<GridLayoutGroup>();
+        }
+
+        
+        RectTransform spacerRect = spacer.GetComponent<RectTransform>();
+        float cellWidth = spacerRect.rect.width / columns;
+        float cellHeight = spacerRect.rect.height / rows;
+
+        grid.cellSize = new Vector2(cellWidth, cellHeight);
+        grid.spacing = new Vector2(5, 5); 
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = columns;
     }
 
     void FillPlayField()
     {
+        int totalCards = rows * columns;
+
+        if (totalCards % 2 != 0)
+        {
+            Debug.LogError("Total number of cards must be even!");
+            return;
+        }
+
+        int neededPairs = totalCards / 2;
+
+        if (neededPairs > spriteList.Count)
+        {
+            Debug.LogError("Not enough sprites for the requested number of pairs!");
+            return;
+        }
+
         List<Sprite> selectedSprites = new List<Sprite>();
 
-        for (int i = 0; i < pairs; i++)
+       
+        for (int i = 0; i < neededPairs; i++)
         {
             selectedSprites.Add(spriteList[i]);
             selectedSprites.Add(spriteList[i]);
         }
 
-        // Shuffle
+       
         for (int i = 0; i < selectedSprites.Count; i++)
         {
             Sprite temp = selectedSprites[i];
@@ -59,15 +143,18 @@ public class CardManager : MonoBehaviour
             selectedSprites[randomIndex] = temp;
         }
 
+        
         for (int i = 0; i < selectedSprites.Count; i++)
         {
             GameObject newCard = Instantiate(cardPrefab, spacer);
             Card card = newCard.GetComponent<Card>();
-            card.id = i / 2 + 1;
+            card.id = i / 2 + 1;  
             card.cardFront = selectedSprites[i];
-            card.cardBack = cardPrefab.GetComponent<Image>().sprite;
+            card.cardBack = cardPrefab.GetComponent<Image>().sprite; 
             allCards.Add(card);
         }
+
+        ArrangeCardsInGrid();
     }
 
     public void AddChosenCard(Card card)
@@ -96,43 +183,50 @@ public class CardManager : MonoBehaviour
     {
         isComparing = true;
 
-        // Wait until both cards have finished flipping
+        // Wait until flipping is done
         while (chosenCards[0].IsFlipping || chosenCards[1].IsFlipping)
         {
             yield return null;
         }
 
-        yield return new WaitForSeconds(0.5f); // extra wait time if needed
+        yield return new WaitForSeconds(0.5f);
 
+        // Check if matched
         if (chosenCards[0].cardFront == chosenCards[1].cardFront)
         {
-            Debug.Log("Match!");
+            correctComboCount++;
             currentScore += matchScore;
+
             foreach (var card in chosenCards)
             {
                 card.GetComponent<Button>().interactable = false;
             }
+
+            SoundManager.instance.PlaySound(SoundManager.instance.matchSound);
         }
         else
         {
-            Debug.Log("Mismatch!");
+            
             currentScore -= mismatchPenalty;
+
             foreach (var card in chosenCards)
             {
                 card.ForceCloseCard();
             }
+
+            SoundManager.instance.PlaySound(SoundManager.instance.mismatchSound);
         }
 
-        UpdateScoreUI();
         SaveScore();
+        UpdateScoreUI();        // ❗ update immediately after changing score
+        UpdateComboCountUI();   // ❗ update combo immediately
 
         chosenCards.Clear();
         isComparing = false;
 
         if (CheckWinCondition())
         {
-            Debug.Log("YOU WON! ??");
-            // Optionally you can show a win screen or restart
+            Debug.Log("YOU WON! 🎉");
         }
     }
 
@@ -140,8 +234,37 @@ public class CardManager : MonoBehaviour
     {
         if (scoreText != null)
         {
-            scoreText.text = currentScore.ToString() ;
+            scoreText.text = "Score: " + currentScore.ToString();
         }
+    }
+
+    void UpdateComboCountUI()
+    {
+        if (comboCountText != null)
+        {
+            comboCountText.text = "Combo: " + correctComboCount.ToString();
+        }
+    }
+
+    void UpdateTimerUI()
+    {
+        if (timerText != null)
+        {
+            timerText.text = "Time: " + Mathf.Round(timer).ToString();
+        }
+    }
+
+    public void UpdateClicksUI() 
+    {
+        if (clicksText != null)
+        {
+            clicksText.text = "Clicks: " + totalClicks.ToString();
+        }
+    }
+    public void IncrementClicks()
+    {
+        totalClicks++;
+        UpdateClicksUI();
     }
 
     void SaveScore()
@@ -159,14 +282,23 @@ public class CardManager : MonoBehaviour
         foreach (var card in allCards)
         {
             if (card.GetComponent<Button>().interactable)
-                return false;
+                return false; 
         }
-        return true;
+        return true; 
+    }
+
+    void EndGame()
+    {
+       
+        Debug.Log("Game Over! Your score: " + currentScore);
     }
 
     public void ResetGame()
     {
         PlayerPrefs.DeleteKey("CardGame_Score");
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+
+
     }
+
 }
