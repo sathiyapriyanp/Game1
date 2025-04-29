@@ -7,196 +7,149 @@ using System.Collections;
 public class CardManager : MonoBehaviour
 {
     public static CardManager instance;
-    [Header("End Panels")]
+
+    [Header("Game Panels")]
     public GameObject winPanel;
     public GameObject losePanel;
+    public GameObject gridSelectionPanel;
+    public GameObject gameplayUIPanel;
+    public GameObject cardArea;
 
     [Header("Card Settings")]
-    public int pairs = 6; // The number of pairs of cards
     public GameObject cardPrefab;
     public Transform spacer;
     public List<Sprite> spriteList = new List<Sprite>();
-
-    [Header("Scoring")]
+    public int rows = 3;
+    public int columns = 4;
     public int matchScore = 100;
     public int mismatchPenalty = 20;
-    private int currentScore = 0;
+    public float startTime = 120f;
 
     [Header("UI Elements")]
     public Text scoreText;
     public Text comboCountText;
     public Text timerText;
-    public Text clicksText; 
+    public Text clicksText;
 
-    private List<Card> allCards = new List<Card>();
-    private List<Card> chosenCards = new List<Card>();
-    private bool isComparing = false;
-
-    // Timer variables
-    public float startTime = 120f; 
+    private int selectedRows, selectedColumns;
+    private int currentScore, correctComboCount, totalClicks;
     private float timer;
-    public bool timerRunning = false;
+    private bool timerRunning, isComparing;
 
-    // Combo count
-    private int correctComboCount = 0;
-
-    // Click counter
-    private int totalClicks = 0;
-
-    [Header("Layout Settings")]
-    public int rows = 3; 
-    public int columns = 4;
-    [Header("Panels and UI Objects")]
-    public GameObject gridSelectionPanel; // Main Menu
-    public GameObject gameplayUIPanel;    // Gameplay UI (timer, score etc.)
-    public GameObject cardArea;           // Where Cards are placed
-   // public GameObject saveButton;
-
-   private int selectedRows;
-private int selectedColumns;
-
-
-
-
+    private readonly List<Card> allCards = new();
+    private readonly List<Card> chosenCards = new();
 
     private void Awake()
     {
-        if (instance == null)
-            instance = this;
+        instance ??= this;
     }
 
     private void Start()
     {
-        timer = startTime;
-        timerRunning = true;
-
-        currentScore = 0;
-        correctComboCount = 0;
-        totalClicks = 0;
-
-        UpdateScoreUI();
-        UpdateComboCountUI();
-        UpdateClicksUI();
-        UpdateTimerUI();
-
+        ResetStats();
         FillPlayField();
-
-        comboCountText.gameObject.SetActive(true);
-        clicksText.gameObject.SetActive(true);
-        timerText.gameObject.SetActive(true);
-        scoreText.gameObject.SetActive(true);
+        UpdateUI();
     }
 
     private void Update()
     {
         if (timerRunning)
         {
-            timer -= Time.deltaTime; 
+            timer -= Time.deltaTime;
             if (timer <= 0)
             {
                 timer = 0;
-                EndGame(); 
+                EndGame();
             }
             UpdateTimerUI();
         }
     }
 
-    void ArrangeCardsInGrid()
+    private void ResetStats()
     {
-        GridLayoutGroup grid = spacer.GetComponent<GridLayoutGroup>();
-        if (grid == null)
-        {
-            grid = spacer.gameObject.AddComponent<GridLayoutGroup>();
-        }
-
-        
-        RectTransform spacerRect = spacer.GetComponent<RectTransform>();
-        float cellWidth = spacerRect.rect.width / columns;
-        float cellHeight = spacerRect.rect.height / rows;
-
-        grid.cellSize = new Vector2(cellWidth, cellHeight);
-        grid.spacing = new Vector2(5, 5); 
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = columns;
+        currentScore = correctComboCount = totalClicks = 0;
+        timer = startTime;
+        timerRunning = true;
     }
 
-    void FillPlayField()
+    private void UpdateUI()
+    {
+        UpdateScoreUI();
+        UpdateComboCountUI();
+        UpdateClicksUI();
+        UpdateTimerUI();
+    }
+
+    private void UpdateScoreUI() => scoreText.text = $"Score: {currentScore}";
+    private void UpdateComboCountUI() => comboCountText.text = $"Combo: {correctComboCount}";
+    private void UpdateClicksUI() => clicksText.text = $"Clicks: {totalClicks}";
+    private void UpdateTimerUI() => timerText.text = $"Time: {Mathf.Round(timer)}";
+
+    public void IncrementClicks()
+    {
+        totalClicks++;
+        UpdateClicksUI();
+    }
+
+    private void FillPlayField()
     {
         int totalCards = rows * columns;
-
-        if (totalCards % 2 != 0)
+        if (totalCards % 2 != 0 || totalCards / 2 > spriteList.Count)
         {
-            Debug.LogError("Total number of cards must be even!");
+            Debug.LogError("Invalid card configuration.");
             return;
         }
 
-        int neededPairs = totalCards / 2;
-
-        if (neededPairs > spriteList.Count)
+        List<Sprite> selectedSprites = GetShuffledSprites(totalCards / 2);
+        foreach (var sprite in selectedSprites)
         {
-            Debug.LogError("Not enough sprites for the requested number of pairs!");
-            return;
-        }
-
-        // Step 1: Shuffle the sprite list before selecting pairs
-        List<Sprite> shuffledSpriteList = new List<Sprite>(spriteList);
-        for (int i = 0; i < shuffledSpriteList.Count; i++)
-        {
-            Sprite temp = shuffledSpriteList[i];
-            int randomIndex = Random.Range(i, shuffledSpriteList.Count);
-            shuffledSpriteList[i] = shuffledSpriteList[randomIndex];
-            shuffledSpriteList[randomIndex] = temp;
-        }
-
-        // Step 2: Select and duplicate the needed sprites
-        List<Sprite> selectedSprites = new List<Sprite>();
-        for (int i = 0; i < neededPairs; i++)
-        {
-            selectedSprites.Add(shuffledSpriteList[i]);
-            selectedSprites.Add(shuffledSpriteList[i]);
-        }
-
-        // Step 3: Shuffle the card positions
-        for (int i = 0; i < selectedSprites.Count; i++)
-        {
-            Sprite temp = selectedSprites[i];
-            int randomIndex = Random.Range(i, selectedSprites.Count);
-            selectedSprites[i] = selectedSprites[randomIndex];
-            selectedSprites[randomIndex] = temp;
-        }
-
-        // Step 4: Create card objects
-        for (int i = 0; i < selectedSprites.Count; i++)
-        {
-            GameObject newCard = Instantiate(cardPrefab, spacer);
-            Card card = newCard.GetComponent<Card>();
-            card.id = i / 2 + 1;
-            card.cardFront = selectedSprites[i];
-            card.cardBack = cardPrefab.GetComponent<Image>().sprite;
+            GameObject cardObj = Instantiate(cardPrefab, spacer);
+            Card card = cardObj.GetComponent<Card>();
+            card.Initialize(sprite);
             allCards.Add(card);
         }
 
         ArrangeCardsInGrid();
     }
+
+    private List<Sprite> GetShuffledSprites(int pairCount)
+    {
+        List<Sprite> pool = new(spriteList);
+        Shuffle(pool);
+        List<Sprite> pairs = new();
+        for (int i = 0; i < pairCount; i++)
+        {
+            pairs.Add(pool[i]);
+            pairs.Add(pool[i]);
+        }
+        Shuffle(pairs);
+        return pairs;
+    }
+
+    private void Shuffle<T>(List<T> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            int rand = Random.Range(i, list.Count);
+            (list[i], list[rand]) = (list[rand], list[i]);
+        }
+    }
+
+    private void ArrangeCardsInGrid()
+    {
+        var grid = spacer.GetComponent<GridLayoutGroup>() ?? spacer.gameObject.AddComponent<GridLayoutGroup>();
+        RectTransform rect = spacer.GetComponent<RectTransform>();
+        grid.cellSize = new Vector2(rect.rect.width / columns, rect.rect.height / rows);
+        grid.spacing = new Vector2(5, 5);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = columns;
+    }
+
     public void AddChosenCard(Card card)
     {
         if (chosenCards.Contains(card)) return;
         chosenCards.Add(card);
-    }
-
-    public bool ReadyToCompare()
-    {
-        return chosenCards.Count == 2;
-    }
-
-    public bool IsComparing()
-    {
-        return isComparing;
-    }
-
-    public void StartCompareProcess()
-    {
-        if (!isComparing)
+        if (chosenCards.Count == 2)
             StartCoroutine(CompareCards());
     }
 
@@ -204,240 +157,119 @@ private int selectedColumns;
     {
         isComparing = true;
 
-        // Wait until flipping is done
-        while (chosenCards[0].IsFlipping || chosenCards[1].IsFlipping)
-        {
-            yield return null;
-        }
-
+        yield return new WaitUntil(() => !chosenCards[0].IsFlipping && !chosenCards[1].IsFlipping);
         yield return new WaitForSeconds(0.5f);
 
-        // Check if matched
-        if (chosenCards[0].cardFront == chosenCards[1].cardFront)
+        if (chosenCards[0].IsMatch(chosenCards[1]))
         {
             correctComboCount++;
             currentScore += matchScore;
-
             foreach (var card in chosenCards)
-            {
-                card.GetComponent<Button>().interactable = false;
-            }
+                card.DisableInteraction();
 
             SoundManager.instance.PlaySound(SoundManager.instance.matchSound);
         }
         else
         {
-            
             currentScore -= mismatchPenalty;
-
             foreach (var card in chosenCards)
-            {
                 card.ForceCloseCard();
-            }
 
             SoundManager.instance.PlaySound(SoundManager.instance.mismatchSound);
         }
 
         SaveScore();
-        UpdateScoreUI();        
-        UpdateComboCountUI();   
+        UpdateScoreUI();
+        UpdateComboCountUI();
 
         chosenCards.Clear();
         isComparing = false;
 
         if (CheckWinCondition())
-        {
-            Debug.Log("YOU WON");
-        }
+            ShowPanel(winPanel);
     }
 
-    void UpdateScoreUI()
-    {
-        if (scoreText != null)
-        {
-            scoreText.text = "Score: " + currentScore.ToString();
-        }
-    }
+    private void SaveScore() => PlayerPrefs.SetInt("CardGame_Score", currentScore);
 
-    void UpdateComboCountUI()
-    {
-        if (comboCountText != null)
-        {
-            comboCountText.text = "Combo: " + correctComboCount.ToString();
-        }
-    }
-
-    void UpdateTimerUI()
-    {
-        if (timerText != null)
-        {
-            timerText.text = "Time: " + Mathf.Round(timer).ToString();
-        }
-    }
-
-    public void UpdateClicksUI() 
-    {
-        if (clicksText != null)
-        {
-            clicksText.text = "Clicks: " + totalClicks.ToString();
-        }
-    }
-    public void IncrementClicks()
-    {
-        totalClicks++;
-        UpdateClicksUI();
-    }
-
-    void SaveScore()
-    {
-        PlayerPrefs.SetInt("CardGame_Score", currentScore);
-    }
-
-    void LoadScore()
-    {
-        currentScore = PlayerPrefs.GetInt("CardGame_Score", 0);
-    }
-
-    bool CheckWinCondition()
+    private bool CheckWinCondition()
     {
         foreach (var card in allCards)
-        {
-            if (card.GetComponent<Button>().interactable)
-                return false; // Still cards left
-        }
-
-        // 🎯 All cards matched!
-        timerRunning = false; // Stop timer
-        if (winPanel != null)
-            winPanel.SetActive(true); // Show Win Screen
-        return true;
-    }
-    public void PlayAgain()
-    {
-        ResetGame();
-    }
-
-    void EndGame()
-    {
-        Debug.Log("Game Over! Your score: " + currentScore);
+            if (card.IsInteractable()) return false;
 
         timerRunning = false;
+        return true;
+    }
 
-        if (losePanel != null)
-            losePanel.SetActive(true); // ➡️ Show Lose Panel
-    }
-    public void TryAgain()
+    private void ShowPanel(GameObject panel)
     {
-        ResetGame();
+        if (panel != null) panel.SetActive(true);
     }
+
+    private void EndGame()
+    {
+        timerRunning = false;
+        ShowPanel(losePanel);
+    }
+
+    public void PlayAgain() => ResetGame();
+    public void TryAgain() => ResetGame();
 
     public void ResetGame()
     {
         timerRunning = false;
-
-        // Hide any end panels
-        if (winPanel != null) winPanel.SetActive(false);
-        if (losePanel != null) losePanel.SetActive(false);
-
-        // Reset score and state
-        currentScore = 0;
-        totalClicks = 0;
-        correctComboCount = 0;
-        timer = startTime;
-
-        // Clear and refill board with same grid
+        winPanel?.SetActive(false);
+        losePanel?.SetActive(false);
+        ResetStats();
         ClearAllCards();
         FillPlayField();
-
-        // Reset UI
-        UpdateScoreUI();
-        UpdateComboCountUI();
-        UpdateClicksUI();
-        UpdateTimerUI();
-
+        UpdateUI();
     }
-    public void StartGame2x2()
+
+    public void StopGameAndGoToMainMenu()
     {
-        selectedRows = 2;
-        selectedColumns = 2;
+        timerRunning = false;
+        gameplayUIPanel?.SetActive(false);
+        cardArea?.SetActive(false);
+        gridSelectionPanel?.SetActive(true);
+        ClearAllCards();
+        ResetStats();
+        UpdateUI();
     }
 
-    public void StartGame2x3()
-    {
-        selectedRows = 2;
-        selectedColumns = 3;
-    }
+    public void StartGame2x2() => SetGridAndStart(2, 2);
+    public void StartGame2x3() => SetGridAndStart(2, 3);
+
     public void OnPlayButtonPressed()
     {
         if (selectedRows > 0 && selectedColumns > 0)
-        {
             StartGame(selectedRows, selectedColumns);
-        }
         else
-        {
             Debug.LogWarning("Please select a grid size first!");
-        }
     }
-    public void StartGame(int selectedRows, int selectedColumns)
+
+    private void SetGridAndStart(int r, int c)
     {
-        rows = selectedRows;
-        columns = selectedColumns;
-
-        gridSelectionPanel.SetActive(false);   // Hide Main Menu
-        gameplayUIPanel.SetActive(true);        // Show Gameplay UI
-        cardArea.SetActive(true);               // Show cards area
-
-       /* if (saveButton != null)
-            saveButton.SetActive(true);*/
-
-        totalClicks = 0;
-        correctComboCount = 0;
-        currentScore = 0;
-        timer = startTime;
-        timerRunning = true;
-
-        ClearAllCards();
-        FillPlayField();
-        UpdateScoreUI();
-        UpdateComboCountUI();
-        UpdateClicksUI();
+        selectedRows = r;
+        selectedColumns = c;
     }
-    void ClearAllCards()
+
+    public void StartGame(int r, int c)
+    {
+        rows = r;
+        columns = c;
+        gridSelectionPanel?.SetActive(false);
+        gameplayUIPanel?.SetActive(true);
+        cardArea?.SetActive(true);
+        ResetGame();
+    }
+
+    private void ClearAllCards()
     {
         foreach (var card in allCards)
-        {
             Destroy(card.gameObject);
-        }
         allCards.Clear();
         chosenCards.Clear();
     }
-    public void StopGameAndGoToMainMenu()
-    {
-        // Stop timer
-        timerRunning = false;
 
-        // Hide gameplay UI and card area
-        if (gameplayUIPanel != null)
-            gameplayUIPanel.SetActive(false);
-
-        if (cardArea != null)
-            cardArea.SetActive(false);
-
-        // Show main menu
-        if (gridSelectionPanel != null)
-            gridSelectionPanel.SetActive(true);
-
-        // Clear cards from previous game
-        ClearAllCards();
-
-        // Reset game state
-        currentScore = 0;
-        totalClicks = 0;
-        correctComboCount = 0;
-        UpdateScoreUI();
-        UpdateComboCountUI();
-        UpdateClicksUI();
-    }
-
-
+    public bool IsComparing() => isComparing;
 }

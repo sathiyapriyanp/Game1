@@ -11,11 +11,11 @@ public class Card : MonoBehaviour
 
     private Image image;
     private Button button;
-    private bool isFlipping = false;
+    private bool isFlipping;
+    private bool isOpen;
     private float flipAmount = 1f;
-    public float flipSpeed = 4f;
-    private bool isOpen = false;
 
+    public float flipSpeed = 4f;
     public bool IsOpen => isOpen;
     public bool IsFlipping => isFlipping;
 
@@ -26,17 +26,22 @@ public class Card : MonoBehaviour
         button.onClick.AddListener(FlipCard);
     }
 
+    public void Initialize(Sprite front)
+    {
+        cardFront = front;
+        cardBack = GetComponent<Image>().sprite;
+        image = GetComponent<Image>();
+    }
+
     public void FlipCard()
     {
         if (isFlipping || isOpen || CardManager.instance.IsComparing())
             return;
-        SoundManager.instance.PlaySound(SoundManager.instance.flipSound);
 
-        // Increment the click count
-        CardManager.instance.UpdateClicksUI(); // Track click count on each flip
+        SoundManager.instance.PlaySound(SoundManager.instance.flipSound);
+        CardManager.instance.IncrementClicks();
         CardManager.instance.AddChosenCard(this);
         StartCoroutine(FlipAnimation(true));
-        CardManager.instance.IncrementClicks();
     }
 
     public void ForceCloseCard()
@@ -46,7 +51,15 @@ public class Card : MonoBehaviour
         StartCoroutine(FlipAnimation(false));
     }
 
-    IEnumerator FlipAnimation(bool opening)
+    public void DisableInteraction()
+    {
+        button.interactable = false;
+    }
+
+    public bool IsMatch(Card other) => cardFront == other.cardFront;
+    public bool IsInteractable() => button.interactable;
+
+    private IEnumerator FlipAnimation(bool opening)
     {
         isFlipping = true;
 
@@ -59,7 +72,7 @@ public class Card : MonoBehaviour
             yield return null;
         }
 
-        // Change sprite
+        // Swap sprite
         image.sprite = opening ? cardFront : cardBack;
         isOpen = opening;
 
@@ -73,10 +86,5 @@ public class Card : MonoBehaviour
         }
 
         isFlipping = false;
-
-        if (opening && CardManager.instance.ReadyToCompare())
-        {
-            CardManager.instance.StartCompareProcess();
-        }
     }
 }
