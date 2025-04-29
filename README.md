@@ -6,7 +6,7 @@ A simple and modular **Card Matching Memory Game** built with Unity. This projec
 ## 🎮 Features
 
 - Flip card animation using scale-based transition
-- Configurable grid sizes (2x2, 2x3, 3x4, etc.)
+- Configurable grid sizes (2x2, 2x3.)
 - Dynamic sprite pairing and randomization
 - Score and combo tracking system
 - Timer-based win/loss logic
@@ -19,8 +19,7 @@ A simple and modular **Card Matching Memory Game** built with Unity. This projec
 
 ### Requirements
 
-- Unity 2020.3 LTS or later
-- TextMeshPro (import via Package Manager if needed)
+- Unity 2021 LTS or later
 - Unity UI system (built-in)
 
 ### Installation
