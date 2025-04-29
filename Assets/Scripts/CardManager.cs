@@ -46,9 +46,11 @@ public class CardManager : MonoBehaviour
 
     private void Start()
     {
-        ResetStats();
+        timer = startTime;
+        timerRunning = true;  // ❌ This starts the timer when the scene loads (main menu!)
+
+        // ...
         FillPlayField();
-        UpdateUI();
     }
 
     private void Update()
