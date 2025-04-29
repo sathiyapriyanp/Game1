@@ -46,8 +46,16 @@ public class CardManager : MonoBehaviour
     [Header("Layout Settings")]
     public int rows = 3; 
     public int columns = 4;
+    [Header("Panels and UI Objects")]
+    public GameObject gridSelectionPanel; // Main Menu
+    public GameObject gameplayUIPanel;    // Gameplay UI (timer, score etc.)
+    public GameObject cardArea;           // Where Cards are placed
+   // public GameObject saveButton;
 
-    
+   private int selectedRows;
+private int selectedColumns;
+
+
 
 
 
@@ -130,16 +138,25 @@ public class CardManager : MonoBehaviour
             return;
         }
 
-        List<Sprite> selectedSprites = new List<Sprite>();
-
-       
-        for (int i = 0; i < neededPairs; i++)
+        // Step 1: Shuffle the sprite list before selecting pairs
+        List<Sprite> shuffledSpriteList = new List<Sprite>(spriteList);
+        for (int i = 0; i < shuffledSpriteList.Count; i++)
         {
-            selectedSprites.Add(spriteList[i]);
-            selectedSprites.Add(spriteList[i]);
+            Sprite temp = shuffledSpriteList[i];
+            int randomIndex = Random.Range(i, shuffledSpriteList.Count);
+            shuffledSpriteList[i] = shuffledSpriteList[randomIndex];
+            shuffledSpriteList[randomIndex] = temp;
         }
 
-       
+        // Step 2: Select and duplicate the needed sprites
+        List<Sprite> selectedSprites = new List<Sprite>();
+        for (int i = 0; i < neededPairs; i++)
+        {
+            selectedSprites.Add(shuffledSpriteList[i]);
+            selectedSprites.Add(shuffledSpriteList[i]);
+        }
+
+        // Step 3: Shuffle the card positions
         for (int i = 0; i < selectedSprites.Count; i++)
         {
             Sprite temp = selectedSprites[i];
@@ -148,20 +165,19 @@ public class CardManager : MonoBehaviour
             selectedSprites[randomIndex] = temp;
         }
 
-        
+        // Step 4: Create card objects
         for (int i = 0; i < selectedSprites.Count; i++)
         {
             GameObject newCard = Instantiate(cardPrefab, spacer);
             Card card = newCard.GetComponent<Card>();
-            card.id = i / 2 + 1;  
+            card.id = i / 2 + 1;
             card.cardFront = selectedSprites[i];
-            card.cardBack = cardPrefab.GetComponent<Image>().sprite; 
+            card.cardBack = cardPrefab.GetComponent<Image>().sprite;
             allCards.Add(card);
         }
 
         ArrangeCardsInGrid();
     }
-
     public void AddChosenCard(Card card)
     {
         if (chosenCards.Contains(card)) return;
@@ -317,10 +333,110 @@ public class CardManager : MonoBehaviour
 
     public void ResetGame()
     {
-        PlayerPrefs.DeleteKey("CardGame_Score");
-        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+        timerRunning = false;
 
+        // Hide any end panels
+        if (winPanel != null) winPanel.SetActive(false);
+        if (losePanel != null) losePanel.SetActive(false);
 
+        // Reset score and state
+        currentScore = 0;
+        totalClicks = 0;
+        correctComboCount = 0;
+        timer = startTime;
+
+        // Clear and refill board with same grid
+        ClearAllCards();
+        FillPlayField();
+
+        // Reset UI
+        UpdateScoreUI();
+        UpdateComboCountUI();
+        UpdateClicksUI();
+        UpdateTimerUI();
+
+    }
+    public void StartGame2x2()
+    {
+        selectedRows = 2;
+        selectedColumns = 2;
+    }
+
+    public void StartGame2x3()
+    {
+        selectedRows = 2;
+        selectedColumns = 3;
+    }
+    public void OnPlayButtonPressed()
+    {
+        if (selectedRows > 0 && selectedColumns > 0)
+        {
+            StartGame(selectedRows, selectedColumns);
+        }
+        else
+        {
+            Debug.LogWarning("Please select a grid size first!");
+        }
+    }
+    public void StartGame(int selectedRows, int selectedColumns)
+    {
+        rows = selectedRows;
+        columns = selectedColumns;
+
+        gridSelectionPanel.SetActive(false);   // Hide Main Menu
+        gameplayUIPanel.SetActive(true);        // Show Gameplay UI
+        cardArea.SetActive(true);               // Show cards area
+
+       /* if (saveButton != null)
+            saveButton.SetActive(true);*/
+
+        totalClicks = 0;
+        correctComboCount = 0;
+        currentScore = 0;
+        timer = startTime;
+        timerRunning = true;
+
+        ClearAllCards();
+        FillPlayField();
+        UpdateScoreUI();
+        UpdateComboCountUI();
+        UpdateClicksUI();
+    }
+    void ClearAllCards()
+    {
+        foreach (var card in allCards)
+        {
+            Destroy(card.gameObject);
+        }
+        allCards.Clear();
+        chosenCards.Clear();
+    }
+    public void StopGameAndGoToMainMenu()
+    {
+        // Stop timer
+        timerRunning = false;
+
+        // Hide gameplay UI and card area
+        if (gameplayUIPanel != null)
+            gameplayUIPanel.SetActive(false);
+
+        if (cardArea != null)
+            cardArea.SetActive(false);
+
+        // Show main menu
+        if (gridSelectionPanel != null)
+            gridSelectionPanel.SetActive(true);
+
+        // Clear cards from previous game
+        ClearAllCards();
+
+        // Reset game state
+        currentScore = 0;
+        totalClicks = 0;
+        correctComboCount = 0;
+        UpdateScoreUI();
+        UpdateComboCountUI();
+        UpdateClicksUI();
     }
 
 
