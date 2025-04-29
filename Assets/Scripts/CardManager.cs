@@ -7,6 +7,9 @@ using System.Collections;
 public class CardManager : MonoBehaviour
 {
     public static CardManager instance;
+    [Header("End Panels")]
+    public GameObject winPanel;
+    public GameObject losePanel;
 
     [Header("Card Settings")]
     public int pairs = 6; // The number of pairs of cards
@@ -42,7 +45,9 @@ public class CardManager : MonoBehaviour
 
     [Header("Layout Settings")]
     public int rows = 3; 
-    public int columns = 4; 
+    public int columns = 4;
+
+    
 
 
 
@@ -218,15 +223,15 @@ public class CardManager : MonoBehaviour
         }
 
         SaveScore();
-        UpdateScoreUI();        // ❗ update immediately after changing score
-        UpdateComboCountUI();   // ❗ update combo immediately
+        UpdateScoreUI();        
+        UpdateComboCountUI();   
 
         chosenCards.Clear();
         isComparing = false;
 
         if (CheckWinCondition())
         {
-            Debug.Log("YOU WON! 🎉");
+            Debug.Log("YOU WON");
         }
     }
 
@@ -282,15 +287,32 @@ public class CardManager : MonoBehaviour
         foreach (var card in allCards)
         {
             if (card.GetComponent<Button>().interactable)
-                return false; 
+                return false; // Still cards left
         }
-        return true; 
+
+        // 🎯 All cards matched!
+        timerRunning = false; // Stop timer
+        if (winPanel != null)
+            winPanel.SetActive(true); // Show Win Screen
+        return true;
+    }
+    public void PlayAgain()
+    {
+        ResetGame();
     }
 
     void EndGame()
     {
-       
         Debug.Log("Game Over! Your score: " + currentScore);
+
+        timerRunning = false;
+
+        if (losePanel != null)
+            losePanel.SetActive(true); // ➡️ Show Lose Panel
+    }
+    public void TryAgain()
+    {
+        ResetGame();
     }
 
     public void ResetGame()
@@ -300,5 +322,6 @@ public class CardManager : MonoBehaviour
 
 
     }
+
 
 }
